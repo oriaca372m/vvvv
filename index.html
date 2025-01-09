@@ -1,0 +1,211 @@
+<!doctype html>
+<html>
+	<head>
+		<title>YouTubeを4画面同時に見るやつ</title>
+		<meta charset="utf-8" />
+	</head>
+	<body>
+		<div class="rootGrid">
+			<div class="wrapper">
+				<div id="player1"></div>
+			</div>
+			<div class="wrapper">
+				<div id="player2"></div>
+			</div>
+			<div class="wrapper">
+				<div id="player3"></div>
+			</div>
+			<div class="wrapper">
+				<div id="player4"></div>
+			</div>
+		</div>
+
+		<div>
+			<button id="playAll" type="button">再生</button>
+			<button id="pauseAll" type="button">一時停止</button>
+			<button id="seekToFirstAll" type="button">最初から</button>
+			<button id="toggleFullscreen" type="button">フルスクリーン</button>
+		</div>
+		<div>
+			<div><label for="videoId1">ID1</label><input id="videoId1" autocomplete="off" /></div>
+			<div><label for="videoId2">ID2</label><input id="videoId2" autocomplete="off" /></div>
+			<div><label for="videoId3">ID3</label><input id="videoId3" autocomplete="off" /></div>
+			<div><label for="videoId4">ID4</label><input id="videoId4" autocomplete="off" /></div>
+		</div>
+		<style>
+			html,
+			body {
+				height: 100%;
+				margin: 0;
+			}
+
+			.rootGrid {
+				display: grid;
+				grid-template-columns: repeat(2, 1fr);
+				grid-template-rows: repeat(2, 1fr);
+				width: 100%;
+				height: 100%;
+			}
+		</style>
+
+		<script>
+			const tag = document.createElement('script')
+
+			tag.src = 'https://www.youtube.com/iframe_api'
+			const firstScriptTag = document.getElementsByTagName('script')[0]
+			firstScriptTag.parentNode.insertBefore(tag, firstScriptTag)
+
+			function extractYouTubeId(url) {
+				const regex =
+					/(?:(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|shorts\/|watch\?v=)))([a-zA-Z0-9_-]+)/
+				const match = url.match(regex)
+				return match ? match[1] : undefined
+			}
+
+			function onYouTubeIframeAPIReady() {
+				class Player {
+					#element
+					#ytPlayer
+					#state
+
+					constructor(element, initialState) {
+						this.#element = element
+						this.#state = {
+							muted: false,
+							volume: 50,
+							videoId: undefined,
+							...initialState,
+						}
+
+						if (this.#state.videoId === undefined) {
+							return
+						}
+
+						this.#applyState(this.#state, {})
+					}
+
+					updateState(state) {
+						const oldState = this.#state
+						this.#state = {
+							...this.#state,
+							...state,
+						}
+
+						this.#applyState(this.#state, oldState)
+					}
+
+					getState() {
+						this.#fetchState()
+						return this.#state
+					}
+
+					playVideo() {
+						this.#ytPlayer?.playVideo()
+					}
+
+					pauseVideo() {
+						this.#ytPlayer?.pauseVideo()
+					}
+
+					seekTo(seconds, allowSeekAhead) {
+						this.#ytPlayer?.seekTo(seconds, allowSeekAhead)
+					}
+
+					#applyState(state, oldState) {
+						if (state.videoId === undefined) {
+							this.#ytPlayer?.destroy()
+							this.#ytPlayer = undefined
+							return
+						}
+
+						if (this.#ytPlayer === undefined) {
+							const player = new YT.Player(this.#element, {
+								height: '100%',
+								width: '100%',
+								videoId: state.videoId,
+								playerVars: {
+									playsinline: 1,
+								},
+								events: {
+									onReady: () => {
+										this.#ytPlayer = player
+										this.#applyVolume(state)
+										this.playVideo()
+									},
+								},
+							})
+						} else {
+							if (oldState.videoId !== state.videoId) {
+								this.#ytPlayer.loadVideoById(state.videoId)
+							}
+							this.#applyVolume(state)
+						}
+					}
+
+					#fetchState() {
+						if (this.#ytPlayer === undefined) {
+							return
+						}
+
+						this.#state.muted = this.#ytPlayer.isMuted()
+						this.#state.volume = this.#ytPlayer.getVolume()
+					}
+
+					#applyVolume(state) {
+						if (state.muted) {
+							this.#ytPlayer.mute()
+						} else {
+							this.#ytPlayer.unMute()
+						}
+						this.#ytPlayer.setVolume(state.volume)
+					}
+				}
+
+				const initialStates = JSON.parse(decodeURIComponent(window.location.hash.slice(1)))
+				const playerIds = ['player1', 'player2', 'player3', 'player4']
+				const players = playerIds.map((id, index) => new Player(id, initialStates[index]))
+
+				document.getElementById('playAll').addEventListener('click', () => {
+					players.forEach((player) => {
+						player.playVideo()
+					})
+				})
+
+				document.getElementById('pauseAll').addEventListener('click', () => {
+					players.forEach((player) => {
+						player.pauseVideo()
+					})
+				})
+
+				document.getElementById('seekToFirstAll').addEventListener('click', () => {
+					players.forEach((player) => {
+						player.seekTo(0, true)
+					})
+				})
+
+				document.getElementById('toggleFullscreen').addEventListener('click', () => {
+					if (document.fullscreenElement === null) {
+						document.documentElement.requestFullscreen()
+					} else {
+						document.exitFullscreen()
+					}
+				})
+
+				players.forEach((player, i) => {
+					const input = document.getElementById(`videoId${i + 1}`)
+					input.value = player.getState().videoId ?? ''
+					input.addEventListener('change', (e) => {
+						const videoId = extractYouTubeId(input.value) ?? input.value
+						input.value = videoId ?? ''
+						player.updateState({ videoId })
+					})
+				})
+
+				window.setInterval(() => {
+					const states = players.map((player) => player.getState())
+					window.location.hash = JSON.stringify(states)
+				}, 1000)
+			}
+		</script>
+	</body>
+</html>
