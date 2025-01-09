@@ -62,6 +62,14 @@
 				return match ? match[1] : undefined
 			}
 
+			function safeJSONParse(str) {
+				try {
+					return JSON.parse(str)
+				} catch {
+					return undefined
+				}
+			}
+
 			function onYouTubeIframeAPIReady() {
 				class Player {
 					#element
@@ -161,7 +169,7 @@
 					}
 				}
 
-				const initialStates = JSON.parse(decodeURIComponent(window.location.hash.slice(1)))
+				const initialStates = safeJSONParse(decodeURIComponent(window.location.hash.slice(1))) ?? []
 				const playerIds = ['player1', 'player2', 'player3', 'player4']
 				const players = playerIds.map((id, index) => new Player(id, initialStates[index]))
 
