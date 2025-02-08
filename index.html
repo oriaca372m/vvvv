@@ -3,6 +3,21 @@
 	<head>
 		<title>YouTubeを4画面同時に見るやつ</title>
 		<meta charset="utf-8" />
+		<style>
+			html,
+			body {
+				height: 100%;
+				margin: 0;
+			}
+
+			.rootGrid {
+				display: grid;
+				grid-template-columns: repeat(2, 1fr);
+				grid-template-rows: repeat(2, 1fr);
+				width: 100%;
+				height: 100%;
+			}
+		</style>
 	</head>
 	<body>
 		<div class="rootGrid">
@@ -27,26 +42,27 @@
 			<button id="toggleFullscreen" type="button">フルスクリーン</button>
 		</div>
 		<div>
-			<div><label for="videoId1">ID1</label><input id="videoId1" autocomplete="off" /></div>
-			<div><label for="videoId2">ID2</label><input id="videoId2" autocomplete="off" /></div>
-			<div><label for="videoId3">ID3</label><input id="videoId3" autocomplete="off" /></div>
-			<div><label for="videoId4">ID4</label><input id="videoId4" autocomplete="off" /></div>
+			<div>
+				<label for="videoId1">ID1</label>
+				<input id="videoId1" autocomplete="off" />
+				<button id="reloadVideo1">リロード</button>
+			</div>
+			<div>
+				<label for="videoId2">ID2</label>
+				<input id="videoId2" autocomplete="off" />
+				<button id="reloadVideo2">リロード</button>
+			</div>
+			<div>
+				<label for="videoId3">ID3</label>
+				<input id="videoId3" autocomplete="off" />
+				<button id="reloadVideo3">リロード</button>
+			</div>
+			<div>
+				<label for="videoId4">ID4</label>
+				<input id="videoId4" autocomplete="off" />
+				<button id="reloadVideo4">リロード</button>
+			</div>
 		</div>
-		<style>
-			html,
-			body {
-				height: 100%;
-				margin: 0;
-			}
-
-			.rootGrid {
-				display: grid;
-				grid-template-columns: repeat(2, 1fr);
-				grid-template-rows: repeat(2, 1fr);
-				width: 100%;
-				height: 100%;
-			}
-		</style>
 
 		<script>
 			const tag = document.createElement('script')
@@ -119,6 +135,35 @@
 						this.#ytPlayer?.seekTo(seconds, allowSeekAhead)
 					}
 
+					reload() {
+						const state = this.getState()
+						if (state.videoId === undefined) {
+							return
+						}
+
+						this.#ytPlayer?.destroy()
+						this.#ytPlayer = undefined
+						this.#createPlayer(state)
+					}
+
+					#createPlayer(state) {
+						const player = new YT.Player(this.#element, {
+							height: '100%',
+							width: '100%',
+							videoId: state.videoId,
+							playerVars: {
+								playsinline: 1,
+							},
+							events: {
+								onReady: () => {
+									this.#ytPlayer = player
+									this.#applyVolume(state)
+									this.playVideo()
+								},
+							},
+						})
+					}
+
 					#applyState(state, oldState) {
 						if (state.videoId === undefined) {
 							this.#ytPlayer?.destroy()
@@ -127,21 +172,7 @@
 						}
 
 						if (this.#ytPlayer === undefined) {
-							const player = new YT.Player(this.#element, {
-								height: '100%',
-								width: '100%',
-								videoId: state.videoId,
-								playerVars: {
-									playsinline: 1,
-								},
-								events: {
-									onReady: () => {
-										this.#ytPlayer = player
-										this.#applyVolume(state)
-										this.playVideo()
-									},
-								},
-							})
+							this.#createPlayer(state)
 						} else {
 							if (oldState.videoId !== state.videoId) {
 								this.#ytPlayer.loadVideoById(state.videoId)
@@ -169,7 +200,8 @@
 					}
 				}
 
-				const initialStates = safeJSONParse(decodeURIComponent(window.location.hash.slice(1))) ?? []
+				const initialStates =
+					safeJSONParse(decodeURIComponent(window.location.hash.slice(1))) ?? []
 				const playerIds = ['player1', 'player2', 'player3', 'player4']
 				const players = playerIds.map((id, index) => new Player(id, initialStates[index]))
 
@@ -206,6 +238,11 @@
 						const videoId = extractYouTubeId(input.value) ?? input.value
 						input.value = videoId ?? ''
 						player.updateState({ videoId })
+					})
+
+					const reloadButton = document.getElementById(`reloadVideo${i + 1}`)
+					reloadButton.addEventListener('click', () => {
+						player.reload()
 					})
 				})
 
