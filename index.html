@@ -237,7 +237,7 @@
 					input.addEventListener('change', (e) => {
 						const videoId = extractYouTubeId(input.value) ?? input.value
 						input.value = videoId ?? ''
-						player.updateState({ videoId })
+						player.updateState({ videoId: videoId === '' ? undefined : videoId })
 					})
 
 					const reloadButton = document.getElementById(`reloadVideo${i + 1}`)
@@ -248,7 +248,7 @@
 
 				window.setInterval(() => {
 					const states = players.map((player) => player.getState())
-					window.location.hash = JSON.stringify(states)
+					window.location.hash = encodeURIComponent(JSON.stringify(states))
 				}, 1000)
 			}
 		</script>
